@@ -5,6 +5,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+
+const { validateMedications } = require('./validate.js.v1');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +38,20 @@ app.use((req, res, next) => {
   });
 });
 
+// Rate limiter: 10 requests per minute per IP
+const analyzeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip,
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'Too many requests. Limit is 10 per minute per IP. Please wait and retry.',
+    });
+  },
+});
+
 // Health check - reveals active provider, never reveals keys
 app.get('/health', (req, res) => {
   res.json({
@@ -42,6 +59,16 @@ app.get('/health', (req, res) => {
     provider: process.env.LLM_PROVIDER || 'anthropic',
     version: 'v1',
   });
+});
+
+// POST /api/analyze - placeholder wired with rate limiter and validation
+// Full implementation added in chunk 4 once LLM adapters are in place
+app.post('/api/analyze', analyzeLimiter, (req, res) => {
+  const error = validateMedications(req.body);
+  if (error) {
+    return res.status(400).json({ error });
+  }
+  res.status(501).json({ error: 'LLM adapter not yet wired. Coming in chunk 4.' });
 });
 
 // 404 handler for any unmatched route
