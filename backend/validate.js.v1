@@ -1,0 +1,72 @@
+'use strict';
+
+const MAX_MEDS = 15;
+const MAX_NAME_LENGTH = 100;
+// Reject obvious HTML/script injection in drug names
+const UNSAFE_CHARS = /<|>|&(?!amp;|lt;|gt;|quot;|#\d+;)|script/i;
+
+function validateMedications(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return 'Request body must be a JSON object.';
+  }
+
+  const { medications } = body;
+
+  if (!Array.isArray(medications)) {
+    return 'medications must be an array.';
+  }
+
+  if (medications.length === 0) {
+    return 'medications must contain at least 1 item.';
+  }
+
+  if (medications.length > MAX_MEDS) {
+    return `medications must contain at most ${MAX_MEDS} items.`;
+  }
+
+  for (let i = 0; i < medications.length; i++) {
+    const med = medications[i];
+
+    if (!med || typeof med !== 'object' || Array.isArray(med)) {
+      return `medications[${i}] must be an object.`;
+    }
+
+    if (typeof med.name !== 'string' || med.name.trim() === '') {
+      return `medications[${i}].name must be a non-empty string.`;
+    }
+
+    if (med.name.length > MAX_NAME_LENGTH) {
+      return `medications[${i}].name exceeds maximum length of ${MAX_NAME_LENGTH} characters.`;
+    }
+
+    if (UNSAFE_CHARS.test(med.name)) {
+      return `medications[${i}].name contains invalid characters.`;
+    }
+
+    // Optional fields: dose and route must be strings if present
+    if (med.dose !== undefined && typeof med.dose !== 'string') {
+      return `medications[${i}].dose must be a string if provided.`;
+    }
+
+    if (med.route !== undefined && typeof med.route !== 'string') {
+      return `medications[${i}].route must be a string if provided.`;
+    }
+  }
+
+  // Optional disease field
+  if (body.disease !== undefined) {
+    if (typeof body.disease !== 'string') {
+      return 'disease must be a string if provided.';
+    }
+    if (body.disease.length > 200) {
+      return 'disease must not exceed 200 characters.';
+    }
+    if (UNSAFE_CHARS.test(body.disease)) {
+      return 'disease contains invalid characters.';
+    }
+  }
+
+  return null;
+}
+
+module.exports = { validateMedications };
