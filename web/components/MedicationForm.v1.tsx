@@ -130,7 +130,116 @@ export function makeRow(name = ''): MedRow {
 }
 
 // ---------------------------------------------------------------------------
-// MedicationForm - shell (rows, submission, and states added in later chunks)
+// MedRowInput - single medication row
+// ---------------------------------------------------------------------------
+
+interface MedRowInputProps {
+  row: MedRow;
+  index: number;
+  showHeaders: boolean;
+  removable: boolean;
+  onUpdate: (patch: Partial<MedRow>) => void;
+  onRemove: () => void;
+}
+
+function MedRowInput({ row, index, showHeaders, removable, onUpdate, onRemove }: MedRowInputProps) {
+  const col = (text: string) => (showHeaders ? text : undefined);
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '2fr 1fr 1fr 1fr auto',
+        gap: 'var(--space-3)',
+        alignItems: 'end',
+      }}
+    >
+      <Input
+        label={col('MEDICATION')}
+        placeholder="e.g. Warfarin"
+        value={row.name}
+        autoComplete="off"
+        aria-label={`Drug name, row ${index + 1}`}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ name: e.target.value })}
+      />
+      <Input
+        label={col('DOSE')}
+        placeholder="5mg"
+        value={row.dose}
+        mono
+        autoComplete="off"
+        aria-label={`Dose, row ${index + 1}`}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ dose: e.target.value })}
+      />
+      <Input
+        label={col('TIME')}
+        placeholder="8am"
+        value={row.time}
+        mono
+        autoComplete="off"
+        aria-label={`Time, row ${index + 1}`}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ time: e.target.value })}
+      />
+      <Select
+        label={col('ROUTE')}
+        options={ROUTE_OPTIONS}
+        value={row.route}
+        aria-label={`Route, row ${index + 1}`}
+        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onUpdate({ route: e.target.value })}
+      />
+      {/* Remove button - hidden (opacity 0) when only one row so layout is stable */}
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={!removable}
+        aria-label={`Remove ${row.name.trim() || `row ${index + 1}`}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 32,
+          height: 32,
+          background: 'transparent',
+          border: '1px solid transparent',
+          borderRadius: 'var(--radius-pill)',
+          cursor: removable ? 'pointer' : 'default',
+          color: 'var(--text-muted)',
+          opacity: removable ? 1 : 0,
+          pointerEvents: removable ? 'auto' : 'none',
+          transition: 'color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+          marginBottom: showHeaders ? 0 : 0,
+          flexShrink: 0,
+        }}
+        onMouseEnter={(e) => {
+          if (!removable) return;
+          (e.currentTarget as HTMLButtonElement).style.color = 'var(--severity-high)';
+          (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--severity-high)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+          (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent';
+        }}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MedicationForm
 // ---------------------------------------------------------------------------
 
 export function MedicationForm({
@@ -145,12 +254,106 @@ export function MedicationForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const atMax = rows.length >= MAX_ROWS;
+  const hasName = rows.some((r) => r.name.trim().length > 0);
+
+  const setRow = useCallback((index: number, patch: Partial<MedRow>) => {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }, []);
+
+  const addRow = useCallback(() => {
+    if (atMax) return;
+    setRows((prev) => [...prev, makeRow()]);
+  }, [atMax]);
+
+  const removeRow = useCallback((index: number) => {
+    setRows((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
+  }, []);
+
   return (
     <Card>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        <p style={{ margin: 0, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>
-          {rows.length} medication{rows.length !== 1 ? 's' : ''} added
-        </p>
+        {rows.map((row, i) => (
+          <MedRowInput
+            key={row.id}
+            row={row}
+            index={i}
+            showHeaders={i === 0}
+            removable={rows.length > 1}
+            onUpdate={(patch) => setRow(i, patch)}
+            onRemove={() => removeRow(i)}
+          />
+        ))}
+
+        {/* Disease field + action buttons row */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto',
+            gap: 'var(--space-3)',
+            alignItems: 'end',
+            paddingTop: 'var(--space-2)',
+            borderTop: '1px solid var(--border-default)',
+            marginTop: 'var(--space-1)',
+          }}
+        >
+          <Input
+            label="DISEASE / CONDITION (OPTIONAL)"
+            placeholder="e.g. HIV"
+            value={disease}
+            hint="Unlocks the clinical research panel"
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDisease(e.target.value)}
+          />
+          <div
+            style={{
+              display: 'flex',
+              gap: 'var(--space-2)',
+              alignItems: 'center',
+              paddingBottom: 22,
+            }}
+          >
+            <div
+              title={atMax ? 'Maximum 15 medications reached' : undefined}
+              style={{ display: 'inline-flex' }}
+            >
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={atMax || loading}
+                onClick={addRow}
+                aria-label="Add medication row"
+                aria-describedby={atMax ? 'med-max-notice' : undefined}
+              >
+                + Add medication
+              </Button>
+            </div>
+            {atMax && (
+              <span
+                id="med-max-notice"
+                role="status"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--text-muted)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Maximum 15 medications reached
+              </span>
+            )}
+            <Button
+              variant="primary"
+              size="md"
+              fullWidth={false}
+              disabled={!hasName || loading}
+              onClick={() => {}}
+              aria-label="Analyze interactions"
+              aria-busy={loading}
+            >
+              {loading ? 'Analyzing...' : 'Analyze interactions'}
+            </Button>
+          </div>
+        </div>
       </div>
     </Card>
   );
