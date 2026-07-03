@@ -1,0 +1,20 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Surfaces" subtitle="Page, card, raised, borders — dark-only" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 16px; background: var(--surface-page); display: flex; gap: 12px; }
+  .sw { flex: 1; height: 100px; border-radius: var(--radius-md); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px 12px; box-sizing: border-box; }
+  .name { font-family: var(--font-body); font-size: 13px; font-weight: 500; color: var(--text-body); margin: 0; }
+  .hex { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin: 0; }
+</style>
+</head>
+<body>
+  <div class="sw" style="background: var(--ms-bg); border: 1px solid var(--ms-border);"><p class="name">Background</p><p class="hex">--ms-bg · #0F1117</p></div>
+  <div class="sw" style="background: var(--ms-surface); border: 1px solid var(--ms-border);"><p class="name">Surface</p><p class="hex">--ms-surface · #181C27</p></div>
+  <div class="sw" style="background: var(--ms-surface-2); border: 1px solid var(--ms-border);"><p class="name">Raised</p><p class="hex">--ms-surface-2 · #1E2330</p></div>
+  <div class="sw" style="background: var(--ms-border);"><p class="name">Border</p><p class="hex">--ms-border · #252A3A</p></div>
+</body>
+</html>

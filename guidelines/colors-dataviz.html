@@ -1,0 +1,33 @@
+<!-- @dsCard group="Colors" viewport="700x170" name="Data-viz Curves" subtitle="Six-color order for 24h plasma curves, with severity bands" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 12px 16px; background: var(--surface-page); }
+  .legend { display: flex; gap: 16px; margin-top: 8px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+  <svg width="100%" height="104" viewBox="0 0 668 104" preserveAspectRatio="none">
+    <rect x="220" y="0" width="120" height="104" fill="rgba(224,154,58,0.12)"></rect>
+    <rect x="430" y="0" width="80" height="104" fill="rgba(224,92,75,0.12)"></rect>
+    <path d="M0 95 C 60 95, 80 18, 140 18 S 280 95, 668 99" fill="none" stroke="#4F8EF7" stroke-width="2.5"></path>
+    <path d="M0 100 C 140 100, 180 30, 250 30 S 400 98, 668 101" fill="none" stroke="#C084FC" stroke-width="2.5"></path>
+    <path d="M0 101 C 280 101, 330 42, 410 42 S 560 96, 668 98" fill="none" stroke="#2DD4BF" stroke-width="2.5"></path>
+    <path d="M0 102 C 380 102, 430 55, 500 55 S 630 99, 668 100" fill="none" stroke="#F472B6" stroke-width="2.5" stroke-dasharray="6 4"></path>
+  </svg>
+  <div class="legend">
+    <span><i style="background:#4F8EF7"></i>--plot-1</span>
+    <span><i style="background:#C084FC"></i>--plot-2</span>
+    <span><i style="background:#2DD4BF"></i>--plot-3</span>
+    <span><i style="background:#F472B6"></i>--plot-4</span>
+    <span><i style="background:#E09A3A"></i>--plot-5</span>
+    <span><i style="background:#3DBD8A"></i>--plot-6</span>
+    <span style="margin-left:auto">bands = interaction windows</span>
+  </div>
+</body>
+</html>

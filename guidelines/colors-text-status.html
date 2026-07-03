@@ -1,0 +1,22 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Text & Status" subtitle="Three text steps, research teal, cache hit/miss dots" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 16px 20px; background: var(--surface-page); display: grid; grid-template-columns: 1fr 1fr; gap: 8px 32px; align-content: center; height: 118px; }
+  .row { display: flex; align-items: center; gap: 12px; font-family: var(--font-body); font-size: 14px; }
+  .tok { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+  <div class="row" style="color: var(--text-body); font-weight: 500;">Primary text — body & headings<span class="tok">#E8EAF0</span></div>
+  <div class="row"><span class="dot" style="background: var(--research);"></span><span style="color: var(--research);">Research teal — trials & papers</span><span class="tok">#2DD4BF</span></div>
+  <div class="row" style="color: var(--text-secondary);">Secondary text — descriptions<span class="tok">#9AA0AD</span></div>
+  <div class="row"><span class="dot" style="background: var(--cache-hit); box-shadow: 0 0 6px rgba(61,189,138,0.6);"></span><span style="color: var(--text-secondary);">Cache hit</span><span class="tok">#3DBD8A</span></div>
+  <div class="row" style="color: var(--text-muted);">Muted text — meta, sources<span class="tok">#6B7280</span></div>
+  <div class="row"><span class="dot" style="background: var(--cache-miss);"></span><span style="color: var(--text-secondary);">Cache miss / live fetch</span><span class="tok">#6B7280</span></div>
+</body>
+</html>

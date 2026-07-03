@@ -1,0 +1,50 @@
+/* DosePair typography — fluid scale, Major Third (1.25×), editorial proportions */
+
+:root {
+  --font-display: "Fraunces", "Source Serif Pro", Georgia, serif;
+  --font-body:    "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono:    "JetBrains Mono", "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  /* ───── Fluid scale via clamp(min, preferred, max) ─────
+     Tuned so mobile (~360px) lands at min and desktop (~1440px) at max. */
+  --text-xs:   clamp(11px,  calc(0.20vw + 10.0px), 12px);   /* @kind font */
+  --text-sm:   clamp(13px,  calc(0.30vw + 11.8px), 14px);   /* @kind font */
+  --text-base: clamp(15px,  calc(0.40vw + 13.2px), 17px);   /* @kind font */
+  --text-md:   clamp(17px,  calc(0.60vw + 14.5px), 21px);   /* @kind font */
+  --text-lg:   clamp(22px,  calc(1.00vw + 18.0px), 28px);   /* @kind font */
+  --text-xl:   clamp(28px,  calc(2.00vw + 20.0px), 40px);   /* @kind font */
+  --text-2xl:  clamp(36px,  calc(3.50vw + 22.0px), 56px);   /* @kind font */
+  --text-3xl:  clamp(44px,  calc(5.00vw + 24.0px), 72px);   /* @kind font */
+
+  --leading-tight: 1.15;
+  --leading-snug:  1.35;
+  --leading-body:  1.55;
+  --leading-loose: 1.7;
+
+  --tracking-caps:    0.08em;   /* uppercase mono labels */
+  --tracking-display: -0.02em;  /* tight on display */
+  --tracking-body:    0;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  color: var(--text-body);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  line-height: var(--leading-tight);
+  color: var(--text-body);
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+}
+
+code, pre, .ms-mono {
+  font-family: var(--font-mono);
+}

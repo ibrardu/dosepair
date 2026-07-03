@@ -1,0 +1,836 @@
+<!-- @dsCard group="DosePair Web" viewport="1440x900" name="DosePair Web App" subtitle="Interactive 5-page recreation — search, analyzer + results, research, history, settings" -->
+<!-- @startingPoint section="Screens" subtitle="Full DosePair web app — all five pages, clickable" viewport="1440x900" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>DosePair — Drug Interaction Analyzer</title>
+<link rel="stylesheet" href="../../styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="../../assets/dosepair-chart.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script type="text/babel" src="../../tweaks-panel.jsx"></script>
+<style>
+  html { min-height: 100%; background: var(--surface-page); }
+  body { margin: 0; min-height: 100vh; background: var(--surface-page); font-family: var(--font-body); -webkit-font-smoothing: antialiased; transition: background .25s; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     BLOCK 1 — Results panels (chart, interactions, insights, schedule, PK table)
+     exported to window.MSPanels
+     ═══════════════════════════════════════════════════════ -->
+<script type="text/babel">
+const PLOTS = ["#4F8EF7","#C084FC","#2DD4BF","#F472B6","#E09A3A","#3DBD8A"];
+
+function PlasmaChart({ drugs, windows = [], schedule = [] }) {
+  const ref = React.useRef(null);
+  const wrapRef = React.useRef(null);
+  const [hover, setHover] = React.useState(null);
+  const H = 280;
+
+  React.useEffect(() => {
+    if (!ref.current) return;
+    window.DosePairChart.drawChart(ref.current, drugs, {
+      windows, hoverT: hover ? hover.t : null, compact: false, height: H,
+    });
+  }, [drugs, windows, hover, H]);
+
+  const onMove = (e) => {
+    const r = ref.current.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const t = window.DosePairChart.xToTime(ref.current, x, { compact: false });
+    const data = window.DosePairChart.getHoverData(drugs, t);
+    setHover({ t, x: e.clientX - r.left, y: e.clientY - r.top, data });
+  };
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <canvas
+        ref={ref}
+        style={{ width: "100%", height: H, display: "block", cursor: "crosshair" }}
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+      />
+      {hover && (
+        <div style={{
+          position: "absolute",
+          left: Math.min(hover.x + 14, (wrapRef.current?.clientWidth || 9999) - 200),
+          top: 12,
+          background: "var(--surface-card)",
+          border: "1px solid var(--border-default)",
+          borderRadius: "var(--radius-md)",
+          padding: "10px 12px",
+          boxShadow: "var(--shadow-lift)",
+          fontFamily: "var(--font-mono)",
+          fontSize: 12,
+          color: "var(--text-body)",
+          pointerEvents: "none",
+          minWidth: 160,
+          zIndex: 5,
+        }}>
+          <div style={{ color: "var(--text-muted)", marginBottom: 6, fontSize: 11 }}>
+            {window.DosePairChart.formatTime(hover.t)}
+          </div>
+          {hover.data.map(d => (
+            <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: d.color, display: "inline-block" }} />
+              <span style={{ flex: 1, fontFamily: "var(--font-body)", fontSize: 12 }}>{d.name}</span>
+              <span style={{ color: "var(--text-secondary)" }}>{d.value.toFixed(0)}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>
+        {drugs.map(d => (
+          <span key={d.name} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 14, height: 3, borderRadius: 2, background: d.color, display: "inline-block" }} />
+            {d.name}
+          </span>
+        ))}
+        <span style={{ marginLeft: "auto" }}>▲ doses · bands = interaction windows · hover for levels</span>
+      </div>
+    </div>
+  );
+}
+
+function InteractionList({ interactions }) {
+  const { Card, Badge, CacheDot } = window.DosePairDesignSystem_7db6c7;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {interactions.map(ix => (
+        <Card key={ix.pair.join("-")} padding="16px 20px">
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6,flexWrap:"wrap"}}>
+            <strong style={{fontFamily:"var(--font-display)",fontSize:"var(--text-base)",fontWeight:600}}>
+              {ix.pair[0]} × {ix.pair[1]}
+            </strong>
+            <Badge tone={ix.severity} />
+            <span style={{fontFamily:"var(--font-mono)",fontSize:11,color:"var(--text-muted)"}}>{ix.source}</span>
+            <span style={{marginLeft:"auto"}}><CacheDot hit={ix.cache_hit} showLabel /></span>
+          </div>
+          <p style={{margin:"0 0 4px",fontSize:"var(--text-sm)",color:"var(--text-body)"}}>{ix.effect}</p>
+          <p style={{margin:0,fontSize:"var(--text-sm)",color:"var(--text-secondary)"}}>{ix.mechanism}</p>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ─── Insight panel helpers ───────────────────────────────────────────────
+function IIcon({type,col,size=16}){
+  const s={width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:col,strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round",display:"block"};
+  if(type==="warning")     return <svg {...s}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>;
+  if(type==="tip")         return <svg {...s}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>;
+  if(type==="food")        return <svg {...s}><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>;
+  if(type==="side_effect") return <svg {...s}><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>;
+  return <svg {...s}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>;
+}
+
+function ScoreMeter({score}){
+  const R=9,CX=12,CY=12,circ=2*Math.PI*R,arc=circ*.75,fill=arc*(score/10);
+  const col=score>=7?"var(--severity-high)":score>=4?"var(--severity-moderate)":"var(--severity-low)";
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" style={{flexShrink:0}} title={`${score}/10`}>
+      <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border-default)" strokeWidth="1.8"
+        strokeDasharray={`${arc} ${circ}`} strokeLinecap="round" transform={`rotate(225 ${CX} ${CY})`}/>
+      <circle cx={CX} cy={CY} r={R} fill="none" stroke={col} strokeWidth="2.2"
+        strokeDasharray={`${fill} ${circ}`} strokeLinecap="round" transform={`rotate(225 ${CX} ${CY})`}/>
+      <text x={CX} y={CY+3} textAnchor="middle" fontSize="7" fontFamily="'IBM Plex Mono',monospace" fill={col} fontWeight="700">{score}</text>
+    </svg>
+  );
+}
+
+const ITYPE={
+  warning:    {label:"Warning",     col:"var(--severity-moderate)",bg:"var(--tint-amber)"},
+  tip:        {label:"Timing tip",  col:"var(--accent)",           bg:"var(--tint-blue)"},
+  info:       {label:"Info",        col:"var(--severity-low)",     bg:"var(--tint-green)"},
+  food:       {label:"Food note",   col:"var(--research)",         bg:"var(--tint-teal)"},
+  side_effect:{label:"Side effect", col:"#C084FC",                 bg:"rgba(192,132,252,.1)"},
+};
+
+function InsightsList({insights}){
+  const {Chip}=window.DosePairDesignSystem_7db6c7;
+  const [open,setOpen]=React.useState({});
+  const toggle=i=>setOpen(o=>({...o,[i]:!o[i]}));
+  if(!insights||!insights.length) return (
+    <div style={{padding:24,textAlign:"center",color:"var(--text-muted)",fontFamily:"var(--font-mono)",fontSize:"var(--text-sm)"}}>No insights for this combination.</div>
+  );
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {insights.map((ins,i)=>{
+        const meta=ITYPE[ins.type]||ITYPE.info;
+        const exp=!!open[i];
+        return (
+          <div key={i} style={{background:"var(--surface-card)",border:"1px solid var(--border-default)",borderRadius:12,overflow:"hidden"}}>
+            <button type="button" onClick={()=>toggle(i)}
+              style={{width:"100%",background:"none",border:"none",cursor:"pointer",padding:"14px 16px",display:"flex",alignItems:"flex-start",gap:12,textAlign:"left"}}>
+              <div style={{width:32,height:32,borderRadius:8,background:meta.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <IIcon type={ins.type} col={meta.col} size={16}/>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+                  <span style={{fontFamily:"var(--font-mono)",fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:meta.col,fontWeight:600}}>{meta.label}</span>
+                  {ins.related_drugs&&ins.related_drugs.map(d=><Chip key={d} style={{height:20,fontSize:11,padding:"0 7px"}}>{d}</Chip>)}
+                  <span style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
+                    {ins.score&&<ScoreMeter score={ins.score}/>}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round"
+                      style={{flexShrink:0,transition:"transform .2s",transform:exp?"rotate(180deg)":"rotate(0deg)"}}>
+                      <path d="m6 9 6 6 6-6"/>
+                    </svg>
+                  </span>
+                </div>
+                <p style={{margin:0,fontSize:"var(--text-sm)",color:"var(--text-body)",fontWeight:500,lineHeight:1.5,textWrap:"pretty"}}>{ins.text}</p>
+              </div>
+            </button>
+            {exp&&<div style={{borderTop:"1px solid var(--border-default)",padding:"12px 16px 14px 60px",background:"var(--surface-raised)"}}>
+              <span style={{fontFamily:"var(--font-mono)",fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)",display:"block",marginBottom:6}}>Why</span>
+              <p style={{margin:0,fontSize:"var(--text-sm)",color:"var(--text-secondary)",lineHeight:1.6}}>{ins.why}</p>
+              {ins.actionable&&<a href="#schedule" style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:10,fontSize:"var(--text-sm)",color:"var(--accent)",textDecoration:"none",fontWeight:500}}>View schedule →</a>}
+            </div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScheduleTimeline({ schedule }) {
+  const { Button } = window.DosePairDesignSystem_7db6c7;
+  const W=760, H=90, pL=16, pR=16;
+  const cx = h => pL + (h/24)*(W-pL-pR);
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",display:"block"}}>
+        <line x1={pL} y1={48} x2={W-pR} y2={48} stroke="#252A3A" strokeWidth="2" />
+        {[0,6,12,18,24].map(h => (
+          <g key={h}>
+            <line x1={cx(h)} y1={44} x2={cx(h)} y2={52} stroke="#6B7280" strokeWidth="1" />
+            <text x={cx(h)} y={68} fill="#6B7280" fontSize="9" fontFamily="IBM Plex Mono,monospace" textAnchor="middle">
+              {h===0||h===24?"12am":h===12?"12pm":h<12?h+"am":(h-12)+"pm"}
+            </text>
+          </g>
+        ))}
+        {schedule.map((s,i) => (
+          <g key={s.drug}>
+            <circle cx={cx(s.hour)} cy={48} r="5" fill="#3DBD8A" />
+            <text x={cx(s.hour)} y={i%2===0?26:38} fill="#E8EAF0" fontSize="10" fontFamily="IBM Plex Sans,sans-serif" textAnchor="middle">
+              {s.drug} · {s.time}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div style={{display:"flex",gap:8,marginTop:8}}>
+        <Button size="sm" variant="secondary">Export .ics</Button>
+        <Button size="sm" variant="secondary">Export PDF</Button>
+        <Button size="sm" variant="ghost">Copy schedule</Button>
+      </div>
+    </div>
+  );
+}
+
+function PKTable({ drugs }) {
+  const { CacheDot } = window.DosePairDesignSystem_7db6c7;
+  const th = {textAlign:"left",padding:"8px 12px",fontFamily:"var(--font-mono)",fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)",borderBottom:"1px solid var(--border-default)",fontWeight:500,whiteSpace:"nowrap"};
+  const td = {padding:"10px 12px",fontSize:"var(--text-sm)",color:"var(--text-body)",borderBottom:"1px solid #1e2330"};
+  const mo = {...td, fontFamily:"var(--font-mono)"};
+  return (
+    <div style={{overflowX:"auto"}}>
+      <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <thead>
+          <tr>
+            {["Drug","RxCUI","Dose time","Half-life","Peak +","Route","Metabolism","Source","Cache"].map(h => <th key={h} style={th}>{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {drugs.map(d => (
+            <tr key={d.name}>
+              <td style={{...td,fontWeight:500}}>{d.name}</td>
+              <td style={mo}>{d.rxcui}</td>
+              <td style={mo}>{d.time}</td>
+              <td style={mo}>{d.halfLife}h</td>
+              <td style={mo}>{d.peakOffset}h</td>
+              <td style={td}>{d.route}</td>
+              <td style={{...td,color:"var(--text-secondary)",fontSize:12}}>{d.metabolism}</td>
+              <td style={mo}>{d.pk_source}</td>
+              <td style={td}><CacheDot hit={d.cache_hit} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+window.MSPanels = { PlasmaChart, InteractionList, InsightsList, ScheduleTimeline, PKTable };
+</script>
+
+<!-- ═══════════════════════════════════════════════════════
+     BLOCK 2 — Home / Search page
+     ═══════════════════════════════════════════════════════ -->
+<script type="text/babel">
+const QUICK_COMBOS = [
+  ["Warfarin","Aspirin"], ["Metformin","Lisinopril"], ["Atorvastatin","Amlodipine"],
+  ["Sertraline","Tramadol"], ["Omeprazole","Clopidogrel"], ["Levothyroxine","Calcium"],
+];
+const RX_SUGGESTIONS = [
+  "Aspirin","Atorvastatin","Amlodipine","Amoxicillin","Calcium","Clopidogrel","Dovato",
+  "Gabapentin","Ibuprofen","Levothyroxine","Lisinopril","Luteolin","Metformin",
+  "Omeprazole","Pregabalin","Sertraline","Sildenafil","Tadalafil","Tramadol","Warfarin",
+];
+
+function HomeScreen({ onAnalyze, logoSrc }) {
+  const { TagInput, Button, Chip } = window.DosePairDesignSystem_7db6c7;
+  const [drugs, setDrugs] = React.useState([]);
+  const [recent, setRecent] = React.useState([["Dovato","Tadalafil","Luteolin"],["Warfarin","Ibuprofen"]]);
+
+  const run = drugs => { if (drugs.length) onAnalyze(drugs); };
+
+  return (
+    <div style={{position:"relative",minHeight:"calc(100vh - 56px)",overflow:"hidden"}}>
+      {/* dot-grid texture */}
+      <div aria-hidden="true" style={{
+        position:"absolute",inset:0,
+        backgroundImage:"radial-gradient(var(--dot-color) 1px, transparent 1px)",
+        backgroundSize:"24px 24px",
+        WebkitMaskImage:"radial-gradient(ellipse 65% 55% at 50% 36%, black 20%, transparent 72%)",
+        maskImage:"radial-gradient(ellipse 65% 55% at 50% 36%, black 20%, transparent 72%)",
+        pointerEvents:"none",
+      }} />
+      <div style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",paddingTop:"12vh",paddingBottom:80}}>
+        {/* Wordmark */}
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:12}}>
+          {logoSrc && <img src={logoSrc} alt="" width="48" height="48" />}
+          <span style={{fontFamily:"var(--font-display)",fontWeight:700,fontSize:"var(--text-2xl)",letterSpacing:"-0.02em",color:"var(--text-body)"}}>DosePair</span>
+        </div>
+        <p style={{margin:"0 0 40px",color:"var(--text-secondary)",fontSize:"var(--text-base)",textAlign:"center"}}>
+          See how your medications interact — before they do.
+        </p>
+
+        {/* Search */}
+        <TagInput tags={drugs} onChange={setDrugs} suggestions={RX_SUGGESTIONS} onSubmit={run} autoFocus />
+        <div style={{marginTop:20}}>
+          <Button size="lg" disabled={drugs.length===0} onClick={() => run(drugs)}>
+            Analyze Interactions
+          </Button>
+        </div>
+
+        {/* Quick combos */}
+        <div style={{marginTop:52,display:"flex",flexDirection:"column",gap:14,alignItems:"center",maxWidth:720,width:"100%",padding:"0 24px"}}>
+          <span style={{fontFamily:"var(--font-mono)",fontSize:"var(--text-xs)",textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)"}}>Quick combos</span>
+          <div style={{display:"flex",flexWrap:"wrap",gap:10,justifyContent:"center"}}>
+            {QUICK_COMBOS.map(combo => (
+              <Chip key={combo.join("+")} onClick={() => run(combo)}>{combo.join(" + ")}</Chip>
+            ))}
+          </div>
+          {recent.length > 0 && <>
+            <span style={{fontFamily:"var(--font-mono)",fontSize:"var(--text-xs)",textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)",marginTop:4}}>Recent searches</span>
+            <div style={{display:"flex",flexWrap:"wrap",gap:10,justifyContent:"center"}}>
+              {recent.map((combo,i) => (
+                <Chip key={combo.join("+")} onClick={() => run(combo)}
+                  onRemove={() => setRecent(recent.filter((_,j) => j!==i))}>
+                  {combo.join(" + ")}
+                </Chip>
+              ))}
+            </div>
+          </>}
+        </div>
+
+        {/* Hero stats */}
+        <div style={{marginTop:60,display:"flex",gap:36,color:"var(--text-muted)",fontSize:"var(--text-sm)",fontFamily:"var(--font-mono)",flexWrap:"wrap",justifyContent:"center"}}>
+          <span><strong style={{color:"var(--text-secondary)",fontWeight:500}}>12,400+</strong> drugs indexed</span>
+          <span><strong style={{color:"var(--text-secondary)",fontWeight:500}}>850K+</strong> interactions cached</span>
+          <span style={{fontStyle:"italic"}}>Designed by Ibrar — while ALONE in hospital</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+window.MSScreens = { ...(window.MSScreens||{}), HomeScreen };
+</script>
+
+<!-- ═══════════════════════════════════════════════════════
+     BLOCK 3 — Analyzer page + mock data pipeline
+     ═══════════════════════════════════════════════════════ -->
+<script type="text/babel">
+const PK_DB = {
+  Warfarin:     {rxcui:"11289",  halfLife:40,  peakOffset:4,   metabolism:"CYP2C9",                  route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Aspirin:      {rxcui:"1191",   halfLife:6,   peakOffset:1,   metabolism:"Hepatic esterases",        route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Dovato:       {rxcui:"2375961",halfLife:14,  peakOffset:1.5, metabolism:"UGT1A1 85%, CYP3A4 12%",  route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Tadalafil:    {rxcui:"358263", halfLife:17.5,peakOffset:2,   metabolism:"CYP3A4 primary",           route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Luteolin:     {rxcui:"—",      halfLife:5,   peakOffset:1,   metabolism:"CYP3A4 inhibitor",        route:"oral", cache_hit:false, pk_source:"llm"},
+  Metformin:    {rxcui:"6809",   halfLife:6.2, peakOffset:2.5, metabolism:"Renal, unchanged",         route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Lisinopril:   {rxcui:"29046",  halfLife:12,  peakOffset:6,   metabolism:"Renal, unchanged",         route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Atorvastatin: {rxcui:"83367",  halfLife:14,  peakOffset:1.5, metabolism:"CYP3A4",                  route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Amlodipine:   {rxcui:"17767",  halfLife:40,  peakOffset:7,   metabolism:"CYP3A4",                  route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Sertraline:   {rxcui:"36437",  halfLife:26,  peakOffset:5,   metabolism:"CYP2D6, CYP2C19",          route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Tramadol:     {rxcui:"10689",  halfLife:6.3, peakOffset:2,   metabolism:"CYP2D6, CYP3A4",           route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Omeprazole:   {rxcui:"7646",   halfLife:1,   peakOffset:1,   metabolism:"CYP2C19",                 route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Clopidogrel:  {rxcui:"32968",  halfLife:6,   peakOffset:1,   metabolism:"CYP2C19 (prodrug)",        route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Levothyroxine:{rxcui:"10582",  halfLife:168, peakOffset:2,   metabolism:"Deiodination",             route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Calcium:      {rxcui:"1897",   halfLife:4,   peakOffset:2,   metabolism:"None (mineral)",           route:"oral", cache_hit:true,  pk_source:"openfda"},
+  Ibuprofen:    {rxcui:"5640",   halfLife:2,   peakOffset:1.5, metabolism:"CYP2C9",                  route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Sildenafil:   {rxcui:"135447", halfLife:4,   peakOffset:1,   metabolism:"CYP3A4 primary",           route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Gabapentin:   {rxcui:"72625",  halfLife:7,   peakOffset:3,   metabolism:"Renal, unchanged",         route:"oral", cache_hit:true,  pk_source:"dailymed"},
+  Pregabalin:   {rxcui:"187832", halfLife:6.3, peakOffset:1.5, metabolism:"Renal, unchanged",         route:"oral", cache_hit:true,  pk_source:"dailymed"},
+};
+
+const IX_DB = [
+  {pair:["Warfarin","Aspirin"],     severity:"high",     cache_hit:true,  source:"rxnav",
+   effect:"Significantly increased bleeding risk — additive anticoagulant and antiplatelet effects.",
+   mechanism:"Aspirin inhibits platelet aggregation; warfarin blocks vitamin-K clotting factors. Aspirin also displaces warfarin from plasma proteins."},
+  {pair:["Warfarin","Ibuprofen"],   severity:"high",     cache_hit:true,  source:"rxnav",
+   effect:"NSAIDs sharply raise GI bleeding risk when combined with warfarin.",
+   mechanism:"COX inhibition impairs platelet function and removes gastric mucosal protection on top of anticoagulation."},
+  {pair:["Sertraline","Tramadol"],  severity:"high",     cache_hit:true,  source:"rxnav",
+   effect:"Risk of serotonin syndrome and lowered seizure threshold.",
+   mechanism:"Both agents raise synaptic serotonin; tramadol's metabolite adds μ-opioid and SNRI activity via CYP2D6 competition."},
+  {pair:["Omeprazole","Clopidogrel"],severity:"moderate",cache_hit:true,  source:"rxnav",
+   effect:"Reduced antiplatelet efficacy of clopidogrel.",
+   mechanism:"Omeprazole inhibits CYP2C19, which activates the clopidogrel prodrug."},
+  {pair:["Levothyroxine","Calcium"], severity:"moderate",cache_hit:true,  source:"rxnav",
+   effect:"Reduced levothyroxine absorption when co-administered.",
+   mechanism:"Calcium chelates levothyroxine in the GI tract. Separate doses by ≥4 hours."},
+  {pair:["Tadalafil","Luteolin"],    severity:"moderate",cache_hit:false, source:"llm",
+   effect:"Possible increased tadalafil exposure and prolonged hypotensive effect.",
+   mechanism:"Luteolin moderately inhibits CYP3A4, the primary clearance pathway for tadalafil."},
+  {pair:["Dovato","Tadalafil"],      severity:"moderate",cache_hit:true,  source:"rxnav",
+   effect:"Minor CYP3A4 overlap; monitor for tadalafil accumulation at higher doses.",
+   mechanism:"Dolutegravir component of Dovato is a minor CYP3A4 substrate; competition at high concentrations is possible."},
+  {pair:["Atorvastatin","Amlodipine"],severity:"moderate",cache_hit:true, source:"rxnav",
+   effect:"Modestly increased statin exposure; monitor for myopathy signs.",
+   mechanism:"Amlodipine weakly inhibits CYP3A4-mediated atorvastatin clearance."},
+  {pair:["Metformin","Lisinopril"],  severity:"low",     cache_hit:true,  source:"rxnav",
+   effect:"Generally safe; small additive blood-glucose lowering.",
+   mechanism:"ACE inhibitors mildly enhance insulin sensitivity independent of metformin."},
+];
+
+function buildResult(meds, disease) {
+  const hours = [8,10,13,18,21,7,14,20];
+  const DRUG_COLORS = ["#4F8EF7","#C084FC","#2DD4BF","#F472B6","#E09A3A","#3DBD8A"];
+  const drugs = meds.map((m,i) => {
+    const pk = PK_DB[m.name] || {rxcui:"—",halfLife:8,peakOffset:2,metabolism:"Unknown",route:"oral",cache_hit:false,pk_source:"llm"};
+    const doseHour = m.hour !== undefined ? m.hour : hours[i % hours.length];
+    return { ...pk, name:m.name, color:DRUG_COLORS[i % DRUG_COLORS.length], time:m.time||(doseHour<=12?doseHour+"am":(doseHour-12)+"pm"), doseHour, doseH:doseHour, dose:m.dose||"", hl:pk.halfLife, pk:pk.peakOffset };
+  });
+  const names = drugs.map(d => d.name);
+  const ord = {high:0,moderate:1,low:2};
+  const interactions = IX_DB
+    .filter(ix => ix.pair.every(p => names.includes(p)))
+    .sort((a,b) => ord[a.severity]-ord[b.severity]);
+  const FOOD_NOTES = {
+    Warfarin:     {note:"Avoid sudden changes in vitamin K intake (leafy greens) — alters INR unpredictably.",score:6},
+    Atorvastatin: {note:"Grapefruit juice significantly increases atorvastatin exposure. Avoid completely.",score:7},
+    Tadalafil:    {note:"Grapefruit juice inhibits CYP3A4 — may increase tadalafil levels. Avoid.",score:5},
+    Levothyroxine:{note:"Take 30–60 min before food. Dairy and calcium reduce absorption significantly.",score:5},
+    Metformin:    {note:"Take with meals to reduce GI side effects (nausea, diarrhoea).",score:3},
+    Sertraline:   {note:"Avoid alcohol — additive CNS depression and worsened mood.",score:4},
+  };
+  const SE_NOTES = [
+    {note:"Monitor for serotonin syndrome: agitation, rapid heartbeat, high temperature, muscle twitching.",score:9,pair:["Sertraline","Tramadol"]},
+    {note:"Myopathy (muscle pain/weakness) risk modestly elevated with this combination.",score:5,pair:["Atorvastatin","Amlodipine"]},
+    {note:"Reduced platelet inhibition — consider alternative PPI if high cardiovascular risk.",score:6,pair:["Omeprazole","Clopidogrel"]},
+    {note:"Monitor for GI bleeding signs: black or tarry stools, abdominal pain.",score:8,pair:["Warfarin","Aspirin"]},
+  ];
+  const insights = [];
+  interactions.forEach(ix => {
+    if (ix.severity==="high")
+      insights.push({type:"warning",score:8,text:`Avoid combining ${ix.pair[0]} and ${ix.pair[1]} without clinical guidance.`,why:ix.mechanism,related_drugs:ix.pair,actionable:false});
+    else if (ix.severity==="moderate")
+      insights.push({type:"tip",score:5,text:`Separate ${ix.pair[0]} and ${ix.pair[1]} doses to reduce peak overlap.`,why:ix.mechanism,related_drugs:ix.pair,actionable:true});
+  });
+  SE_NOTES.forEach(se => {
+    if (se.pair.every(d => names.includes(d)))
+      insights.push({type:"side_effect",score:se.score,text:se.note,why:"Pharmacodynamic interaction — both agents contribute to the same adverse pathway.",related_drugs:se.pair,actionable:false});
+  });
+  const seenF = new Set();
+  drugs.forEach(d => {
+    const fn = FOOD_NOTES[d.name];
+    if (fn && !seenF.has(d.name)) { seenF.add(d.name); insights.push({type:"food",score:fn.score,text:fn.note,why:"Food-drug interaction via absorption, CYP3A4 metabolism, or pharmacodynamic overlap.",related_drugs:[d.name],actionable:false}); }
+  });
+  // (Cache insight removed — not user-facing.)
+  const schedule = drugs.map((d,i) => {
+    const h = Math.max(6, Math.min(22, 7 + i * Math.max(2, Math.floor(14/Math.max(drugs.length,1)))));
+    return {drug:d.name, hour:h, time:h<=12?h+"am":(h-12)+"pm", recommended:true};
+  });
+  const windows = interactions.slice(0,3).map(ix => {
+    const a = drugs.find(d => d.name===ix.pair[0]);
+    const b = drugs.find(d => d.name===ix.pair[1]);
+    if (!a||!b) return null;
+    const s = Math.min(a.doseHour,b.doseHour);
+    return {start:s, end:Math.min(24,s+4), severity:ix.severity};
+  }).filter(Boolean);
+  const worst = interactions[0]?.severity||null;
+  const hits = drugs.filter(d=>d.cache_hit).length;
+  const allKnown = drugs.every(d => d.pk_source!=="llm");
+  const summary = interactions.length
+    ? `Found ${interactions.length} interaction${interactions.length>1?"s":""} across ${drugs.length} medication${drugs.length>1?"s":""}${worst?` — worst severity: ${worst}`:""}.`
+    : `No known interactions found across ${drugs.length} medication${drugs.length>1?"s":""}. Optimized schedule below.`;
+  return { drugs, interactions, insights, schedule, windows, summary,
+    llm_source: allKnown?"groq":"claude haiku",
+    cache_summary: `${hits}/${drugs.length} cache hits` };
+}
+
+function AnalyzerScreen({ initialDrugs = [] }) {
+  const { Button, Input, Select, Card, Badge, Disclaimer } = window.DosePairDesignSystem_7db6c7;
+  const { PlasmaChart, InteractionList, InsightsList, ScheduleTimeline, PKTable } = window.MSPanels;
+  const mkRow = (name="",i=0) => ({ name, dose:"", time:"", route:"oral", key:`${name}-${i}-${Math.random().toString(36).slice(2,7)}` });
+  const [rows, setRows] = React.useState(() =>
+    initialDrugs.length ? initialDrugs.map(mkRow) : [mkRow("Dovato",0), mkRow("Tadalafil",1), mkRow("Luteolin",2)]
+  );
+  const [disease, setDisease] = React.useState("");
+  const [result, setResult] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const resultsRef = React.useRef(null);
+  const setRow = (i,patch) => setRows(rows.map((r,j) => j===i?{...r,...patch}:r));
+  const analyze = () => {
+    const meds = rows.filter(r => r.name.trim());
+    if (!meds.length) return;
+    setLoading(true); setResult(null);
+    setTimeout(() => {
+      setResult(buildResult(meds, disease.trim()));
+      setLoading(false);
+      setTimeout(() => { if (resultsRef.current) resultsRef.current.scrollIntoView({behavior:"smooth",block:"start"}); }, 80);
+    }, 700);
+  };
+  React.useEffect(() => {
+    if (initialDrugs.length) analyze();
+  }, []);
+  const lbl = {fontFamily:"var(--font-mono)",fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)",display:"block",marginBottom:10};
+
+  return (
+    <div style={{maxWidth:900,margin:"0 auto",padding:"40px 24px 100px",display:"flex",flexDirection:"column",gap:20}}>
+      <div>
+        <h1 style={{fontSize:"var(--text-lg)",margin:"0 0 6px"}}>Analyzer</h1>
+        <p style={{margin:0,color:"var(--text-secondary)",fontSize:"var(--text-sm)"}}>Enter each medication with dose, time and route. Add a condition to unlock disease research.</p>
+      </div>
+
+      <Card>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {/* column headers */}
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 32px",gap:12,paddingBottom:2}}>
+            {["Medication","Dose","Time","Route",""].map(h => <span key={h} style={{fontFamily:"var(--font-mono)",fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-muted)"}}>{h}</span>)}
+          </div>
+          {rows.map((row,i) => (
+            <div key={row.key} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 32px",gap:12,alignItems:"center"}}>
+              <Input placeholder="e.g. Tadalafil" value={row.name} onChange={e => setRow(i,{name:e.target.value})} />
+              <Input placeholder="5mg" mono value={row.dose} onChange={e => setRow(i,{dose:e.target.value})} />
+              <Input placeholder="8am" mono value={row.time} onChange={e => setRow(i,{time:e.target.value})} />
+              <Select options={["oral","topical","injection","inhaled"]} value={row.route} onChange={e => setRow(i,{route:e.target.value})} />
+              <button type="button" onClick={() => setRows(rows.filter((_,j) => j!==i))}
+                style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",fontSize:18,lineHeight:1,padding:0,display:"flex",alignItems:"center",justifyContent:"center",height:40}}>×</button>
+            </div>
+          ))}
+          <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"end",marginTop:4}}>
+            <Input label="Disease / condition (optional)" placeholder="e.g. HIV" value={disease} onChange={e => setDisease(e.target.value)} hint="Unlocks the clinical research panel in results." />
+            <div style={{display:"flex",gap:8,paddingBottom:22}}>
+              <Button variant="secondary" disabled={rows.length>=15} onClick={() => setRows([...rows, mkRow("",rows.length)])}>+ Add medication</Button>
+              <Button onClick={analyze} disabled={loading}>{loading?"Analyzing…":"Analyze Interactions"}</Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {loading && (
+        <Card>
+          <div style={{display:"flex",gap:12,alignItems:"center",color:"var(--text-secondary)",fontFamily:"var(--font-mono)",fontSize:"var(--text-sm)"}}>
+            <span style={{animation:"spin 1s linear infinite",display:"inline-block",fontSize:16}}>⟳</span>
+            Checking drug_cache → fetching PK data → routing to LLM…
+          </div>
+        </Card>
+      )}
+
+      {result && !loading && (
+        <div ref={resultsRef} style={{display:"flex",flexDirection:"column",gap:20}}>
+          <Card title="Summary">
+            
+            <p style={{margin:0,fontSize:"var(--text-base)",color:"var(--text-body)"}}>{result.summary}</p>
+          </Card>
+          <Card title="24-hour plasma levels">
+            <PlasmaChart drugs={result.drugs} windows={result.windows} schedule={result.schedule} />
+          </Card>
+          {result.interactions.length > 0 && (
+            <div>
+              <span style={lbl}>Interactions · {result.interactions.length}</span>
+              <InteractionList interactions={result.interactions} />
+            </div>
+          )}
+          <div>
+            <span style={lbl}>Insights · {result.insights.length}</span>
+            <InsightsList insights={result.insights} />
+          </div>
+          <Card title="Recommended schedule" id="schedule">
+            <ScheduleTimeline schedule={result.schedule} />
+          </Card>
+          <Card title="Pharmacokinetics">
+            <PKTable drugs={result.drugs} />
+          </Card>
+          <Disclaimer />
+        </div>
+      )}
+    </div>
+  );
+}
+window.MSScreens = { ...(window.MSScreens||{}), AnalyzerScreen };
+</script>
+
+<!-- ═══════════════════════════════════════════════════════
+     BLOCK 4 — Research page
+     ═══════════════════════════════════════════════════════ -->
+<script type="text/babel">
+const MOCK_RESEARCH = {
+  trials:[
+    {id:"NCT05451234",title:"Long-acting injectable dolutegravir in virally suppressed adults",phase:"Phase 3",status:"Recruiting",sponsor:"ViiV Healthcare"},
+    {id:"NCT05512879",title:"Doravirine / islatravir switch study vs. continued ART",phase:"Phase 3",status:"Active, not recruiting",sponsor:"Merck Sharp & Dohme"},
+    {id:"NCT05634321",title:"Broadly neutralising antibody maintenance after ART interruption",phase:"Phase 2",status:"Recruiting",sponsor:"NIAID"},
+    {id:"NCT05729984",title:"Weekly oral lenacapavir plus islatravir — treatment-experienced",phase:"Phase 2",status:"Enrolling by invitation",sponsor:"Gilead Sciences"},
+  ],
+  pubmed:[
+    {pmid:"38412309",title:"Drug–drug interactions between antiretrovirals and PDE5 inhibitors: a systematic review",journal:"Clin Pharmacokinet",year:2025},
+    {pmid:"38217745",title:"UGT1A1 polymorphisms and dolutegravir exposure in diverse populations",journal:"Br J Clin Pharmacol",year:2024},
+    {pmid:"38095512",title:"Flavonoid-mediated CYP3A4 inhibition: clinical relevance of dietary supplements",journal:"Drug Metab Dispos",year:2024},
+    {pmid:"37956120",title:"Two-drug regimens for HIV-1: durability of dolutegravir / lamivudine at 5 years",journal:"Lancet HIV",year:2024},
+  ],
+  fda:[
+    {name:"Lenacapavir (Sunlenca)",date:"2022-12-22",note:"First capsid inhibitor — heavily treatment-experienced adults"},
+    {name:"Cabotegravir + rilpivirine LA (Cabenuva)",date:"2021-01-21",note:"First complete long-acting injectable regimen"},
+    {name:"Dolutegravir / lamivudine (Dovato)",date:"2019-04-08",note:"First 2-drug complete regimen for treatment-naïve adults"},
+  ],
+};
+
+function ResearchScreen({ initialDisease="HIV" }) {
+  const { Input, Button, Tabs, Card, Badge, CacheDot } = window.DosePairDesignSystem_7db6c7;
+  const [query, setQuery] = React.useState(initialDisease);
+  const [searched, setSearched] = React.useState(initialDisease);
+  const [tab, setTab] = React.useState("trials");
+  const meta = {fontFamily:"var(--font-mono)",fontSize:11,color:"var(--text-muted)"};
+  const search = () => { if (query.trim()) setSearched(query.trim()); };
+
+  return (
+    <div style={{maxWidth:900,margin:"0 auto",padding:"40px 24px 100px",display:"flex",flexDirection:"column",gap:20}}>
+      <div>
+        <h1 style={{fontSize:"var(--text-lg)",margin:"0 0 6px"}}>Research</h1>
+        <p style={{margin:0,color:"var(--text-secondary)",fontSize:"var(--text-sm)"}}>Browse clinical trials, papers and FDA approvals for any condition — no medications required.</p>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"end"}}>
+        <Input label="Condition / disease" placeholder="e.g. HIV, hypertension, type 2 diabetes"
+          value={query} onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => { if (e.key==="Enter") search(); }} />
+        <Button onClick={search} style={{marginBottom:1}}>Search</Button>
+      </div>
+      {searched && <>
+        <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <Badge tone="research">{searched}</Badge>
+          <CacheDot hit showLabel />
+          <span style={meta}>cached 2 days ago · TTL 7 days</span>
+          <Button size="sm" variant="ghost" style={{marginLeft:"auto"}}>↺ Refresh</Button>
+        </div>
+        <Tabs
+          tabs={[
+            {id:"trials",label:"Clinical Trials",count:MOCK_RESEARCH.trials.length},
+            {id:"pubmed",label:"PubMed Papers",count:MOCK_RESEARCH.pubmed.length},
+            {id:"fda",label:"FDA Approvals",count:MOCK_RESEARCH.fda.length},
+          ]}
+          active={tab} onChange={setTab}
+        />
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(360px,1fr))",gap:12}}>
+          {tab==="trials" && MOCK_RESEARCH.trials.map(t => (
+            <Card key={t.id} padding="16px">
+              <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                <Badge tone="research">{t.phase}</Badge>
+                <Badge>{t.status}</Badge>
+              </div>
+              <p style={{margin:"0 0 10px",fontSize:"var(--text-sm)",fontWeight:500,color:"var(--text-body)"}}>{t.title}</p>
+              <span style={meta}>{t.id} · {t.sponsor}</span>
+            </Card>
+          ))}
+          {tab==="pubmed" && MOCK_RESEARCH.pubmed.map(p => (
+            <Card key={p.pmid} padding="16px">
+              <p style={{margin:"0 0 10px",fontSize:"var(--text-sm)",fontWeight:500,color:"var(--text-body)"}}>{p.title}</p>
+              <span style={meta}>{p.journal} · {p.year} · PMID {p.pmid}</span>
+            </Card>
+          ))}
+          {tab==="fda" && MOCK_RESEARCH.fda.map(f => (
+            <Card key={f.name} padding="16px">
+              <p style={{margin:"0 0 6px",fontSize:"var(--text-sm)",fontWeight:500,color:"var(--text-body)"}}>{f.name}</p>
+              <p style={{margin:"0 0 10px",fontSize:"var(--text-sm)",color:"var(--text-secondary)"}}>{f.note}</p>
+              <span style={meta}>Approved {f.date}</span>
+            </Card>
+          ))}
+        </div>
+      </>}
+    </div>
+  );
+}
+window.MSScreens = { ...(window.MSScreens||{}), ResearchScreen };
+</script>
+
+<!-- ═══════════════════════════════════════════════════════
+     BLOCK 5 — History page
+     ═══════════════════════════════════════════════════════ -->
+<script type="text/babel">
+function HistoryScreen({ onReanalyze }) {
+  const { Card, Badge, Chip, Button } = window.DosePairDesignSystem_7db6c7;
+  const [items, setItems] = React.useState([
+    {ts:"Today, 9:42am",   drugs:["Dovato","Tadalafil","Luteolin"], worst:"moderate", llm:"claude haiku"},
+    {ts:"Today, 8:15am",   drugs:["Warfarin","Aspirin"],            worst:"high",     llm:"groq"},
+    {ts:"Yesterday, 10pm", drugs:["Sertraline","Tramadol"],         worst:"high",     llm:"groq"},
+    {ts:"Yesterday, 2pm",  drugs:["Metformin","Lisinopril"],        worst:"low",      llm:"groq"},
+    {ts:"Jun 7, 11:20am",  drugs:["Levothyroxine","Calcium"],       worst:"moderate", llm:"groq"},
+  ]);
+  return (
+    <div style={{maxWidth:900,margin:"0 auto",padding:"40px 24px 100px",display:"flex",flexDirection:"column",gap:20}}>
+      <div style={{display:"flex",alignItems:"flex-end",gap:12}}>
+        <div style={{flex:1}}>
+          <h1 style={{fontSize:"var(--text-lg)",margin:"0 0 6px"}}>History</h1>
+          <p style={{margin:0,color:"var(--text-secondary)",fontSize:"var(--text-sm)"}}>
+            Analyses from this session.&nbsp;
+            <span style={{fontFamily:"var(--font-mono)",fontSize:11,color:"var(--text-muted)"}}>session b4f2…91ce</span>
+          </p>
+        </div>
+        {items.length>0 && <Button variant="danger" size="sm" onClick={() => setItems([])}>Clear history</Button>}
+      </div>
+      {items.length===0 ? (
+        <Card style={{textAlign:"center",padding:"var(--space-7)"}}>
+          <p style={{margin:"0 0 6px",fontWeight:500}}>No analyses yet</p>
+          <p style={{margin:0,color:"var(--text-secondary)",fontSize:"var(--text-sm)"}}>Run a search from the home page and it will appear here.</p>
+        </Card>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {items.map((h,i) => (
+            <Card key={i} padding="14px 18px">
+              <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <span style={{fontFamily:"var(--font-mono)",fontSize:11,color:"var(--text-muted)",width:136,flexShrink:0}}>{h.ts}</span>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",flex:1}}>
+                  {h.drugs.map(d => <Chip key={d} style={{height:24,fontSize:12}}>{d}</Chip>)}
+                </div>
+                <Badge tone={h.worst} />
+                <Badge tone="info">{h.llm}</Badge>
+                <Button size="sm" variant="secondary" onClick={() => onReanalyze && onReanalyze(h.drugs)}>Re-analyze</Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+window.MSScreens = { ...(window.MSScreens||{}), HistoryScreen };
+</script>
+
+<!-- ═══════════════════════════════════════════════════════
+     BLOCK 6 — Settings page
+     ═══════════════════════════════════════════════════════ -->
+<script type="text/babel">
+function SettingsScreen() {
+  const { Card, Input, Switch, Button, Disclaimer } = window.DosePairDesignSystem_7db6c7;
+  const [dark, setDark] = React.useState(true);
+  const [ownKey, setOwnKey] = React.useState(false);
+  return (
+    <div style={{maxWidth:640,margin:"0 auto",padding:"40px 24px 100px",display:"flex",flexDirection:"column",gap:20}}>
+      <h1 style={{fontSize:"var(--text-lg)",margin:0}}>Settings</h1>
+      <Card title="Connection">
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <Input label="Backend URL" mono defaultValue="https://dosepair.app" hint="Only change this if you self-host DosePair." />
+          <Switch checked={ownKey} onChange={setOwnKey} label="Use my own Groq API key" />
+          {ownKey && <Input label="Groq API key" mono placeholder="gsk_…" hint="Stored in this browser only; overrides the server key." />}
+        </div>
+      </Card>
+      <Card title="Appearance">
+        <div style={{display:"flex",gap:32}}>
+          <Switch checked={dark} onChange={setDark} label="Dark theme" />
+          <Switch checked={!dark} onChange={v => setDark(!v)} label="Follow system" />
+        </div>
+      </Card>
+      <Card title="Data">
+        <div style={{display:"flex",alignItems:"center",gap:16}}>
+          <p style={{margin:0,flex:1,fontSize:"var(--text-sm)",color:"var(--text-secondary)"}}>Removes all analyses stored under your anonymous session ID.</p>
+          <Button variant="danger" size="sm">Clear history</Button>
+        </div>
+      </Card>
+      <Card title="About">
+        <p style={{margin:"0 0 8px",fontSize:"var(--text-sm)",color:"var(--text-secondary)"}}>
+          DosePair v1 · drug data from RxNorm, DailyMed, RxNav and OpenFDA · research from PubMed and ClinicalTrials.gov.
+          Designed by Ibrar — while ALONE in hospital.
+        </p>
+        <span style={{fontFamily:"var(--font-mono)",fontSize:11,color:"var(--text-muted)"}}>
+          session b4f2…91ce
+        </span>
+      </Card>
+      <Disclaimer />
+    </div>
+  );
+}
+window.MSScreens = { ...(window.MSScreens||{}), SettingsScreen };
+</script>
+
+<!-- ═══════════════════════════════════════════════════════
+     BLOCK 7 — App shell + mount
+     ═══════════════════════════════════════════════════════ -->
+<script type="text/babel">
+const { TopNav } = window.DosePairDesignSystem_7db6c7;
+const { HomeScreen, AnalyzerScreen, ResearchScreen, HistoryScreen, SettingsScreen } = window.MSScreens;
+const { useTweaks, TweaksPanel, TweakSection, TweakRadio } = window;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "light"
+}/*EDITMODE-END*/;
+
+function DosePairApp() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const dark = t.theme !== "light";
+
+  React.useEffect(() => {
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  }, [dark]);
+
+  const [page, setPage] = React.useState(() => sessionStorage.getItem("ms-page") || "home");
+  const [prefill, setPrefill] = React.useState([]);
+
+  const nav = id => {
+    setPage(id);
+    sessionStorage.setItem("ms-page", id);
+    if (id !== "analyze") setPrefill([]);
+    window.scrollTo({top:0});
+  };
+  const analyze = drugs => {
+    setPrefill(drugs);
+    setPage("analyze");
+    sessionStorage.setItem("ms-page","analyze");
+    window.scrollTo({top:0});
+  };
+
+  return (
+    <div>
+      <TopNav active={page} onNavigate={nav} logoSrc="../../assets/logo.svg" fixed />
+      <div style={{paddingTop:"var(--height-nav)"}}>
+        {page==="home"     && <HomeScreen     onAnalyze={analyze} logoSrc="../../assets/logo.svg" />}
+        {page==="analyze"  && <AnalyzerScreen key={prefill.join("+")} initialDrugs={prefill} />}
+        {page==="research" && <ResearchScreen />}
+        {page==="history"  && <HistoryScreen  onReanalyze={analyze} />}
+        {page==="settings" && <SettingsScreen />}
+      </div>
+      <TweaksPanel>
+        <TweakSection label="Appearance" />
+        <TweakRadio label="Theme" value={t.theme} options={["dark","light"]}
+          onChange={v => setTweak("theme", v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<DosePairApp />);
+</script>
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</body>
+</html>

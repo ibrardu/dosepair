@@ -1,0 +1,19 @@
+<!-- @dsCard group="Spacing" viewport="700x170" name="Elevation & Glow" subtitle="Borders carry hierarchy; shadows are subtle; focus = accent glow" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-page); display: flex; gap: 20px; align-items: center; }
+  .box { flex: 1; height: 100px; border-radius: var(--radius-lg); background: var(--surface-card); border: 1px solid var(--border-default); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-family: var(--font-body); font-size: 13px; color: var(--text-body); }
+  .tok { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div class="box" style="box-shadow: var(--shadow-card);">Card<span class="tok">--shadow-card</span></div>
+  <div class="box" style="box-shadow: var(--shadow-lift); transform: translateY(-2px);">Hover lift<span class="tok">--shadow-lift</span></div>
+  <div class="box" style="box-shadow: var(--shadow-modal); background: var(--surface-raised);">Modal<span class="tok">--shadow-modal</span></div>
+  <div class="box" style="border-color: var(--border-focus); box-shadow: var(--glow-focus);">Focus<span class="tok">--glow-focus</span></div>
+</body>
+</html>

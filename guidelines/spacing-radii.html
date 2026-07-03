@@ -1,0 +1,19 @@
+<!-- @dsCard group="Spacing" viewport="700x160" name="Radii" subtitle="6 / 10 / 14 / pill — chips and search are always pills" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 20px 24px; background: var(--surface-page); display: flex; gap: 16px; align-items: center; }
+  .box { background: var(--surface-card); border: 1px solid var(--border-default); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+  <div class="box" style="width: 110px; height: 90px; border-radius: var(--radius-sm);">sm · 6</div>
+  <div class="box" style="width: 110px; height: 90px; border-radius: var(--radius-md);">md · 10</div>
+  <div class="box" style="width: 110px; height: 90px; border-radius: var(--radius-lg);">lg · 14</div>
+  <div class="box" style="width: 160px; height: 32px; border-radius: var(--radius-pill);">chip · pill</div>
+  <div class="box" style="flex: 1; height: 56px; border-radius: var(--radius-pill); border-color: var(--border-focus); box-shadow: var(--glow-search);">search · pill</div>
+</body>
+</html>

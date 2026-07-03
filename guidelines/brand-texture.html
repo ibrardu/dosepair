@@ -1,0 +1,23 @@
+<!-- @dsCard group="Brand" viewport="700x170" name="Homepage Texture" subtitle="Subtle dot-grid background — homepage only, fades out radially" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; background: var(--surface-page); height: 170px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .dots {
+    position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(154, 160, 173, 0.18) 1px, transparent 1px);
+    background-size: 24px 24px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 90% at 50% 50%, black 30%, transparent 75%);
+    mask-image: radial-gradient(ellipse 70% 90% at 50% 50%, black 30%, transparent 75%);
+  }
+  .meta { position: relative; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; background: var(--surface-page); padding: 6px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-pill); }
+</style>
+</head>
+<body>
+  <div class="dots"></div>
+  <span class="meta">dot grid 24px · 18% alpha · radial mask · homepage only</span>
+</body>
+</html>

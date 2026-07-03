@@ -1,0 +1,40 @@
+<!-- @dsCard group="Brand" viewport="700x170" name="Iconography" subtitle="Lucide — 2px stroke, 16–20px, secondary color; severity icons take semantic colors" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  body { margin: 0; padding: 20px 24px; background: var(--surface-page); display: flex; flex-direction: column; gap: 14px; justify-content: center; }
+  .row { display: flex; gap: 22px; align-items: center; color: var(--text-secondary); }
+  .row svg { width: 20px; height: 20px; }
+  .meta { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <i data-lucide="search"></i>
+    <i data-lucide="pill"></i>
+    <i data-lucide="flask-conical"></i>
+    <i data-lucide="history"></i>
+    <i data-lucide="settings"></i>
+    <i data-lucide="clock"></i>
+    <i data-lucide="calendar-plus"></i>
+    <i data-lucide="download"></i>
+    <i data-lucide="copy"></i>
+    <i data-lucide="refresh-cw"></i>
+    <i data-lucide="x"></i>
+    <i data-lucide="plus"></i>
+    <span style="display:flex; gap:22px; align-items:center;">
+      <i data-lucide="triangle-alert" style="color: var(--severity-moderate);"></i>
+      <i data-lucide="octagon-alert" style="color: var(--severity-high);"></i>
+      <i data-lucide="circle-check" style="color: var(--severity-low);"></i>
+      <i data-lucide="lightbulb" style="color: var(--accent);"></i>
+      <i data-lucide="microscope" style="color: var(--research);"></i>
+    </span>
+  </div>
+  <div class="meta">Lucide via CDN · stroke-width 2 · grey by default, semantic color only for severity/insight icons · no emoji</div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

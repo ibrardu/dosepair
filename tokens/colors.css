@@ -1,0 +1,131 @@
+/* DosePair color system — editorial: cream paper, ink type, single bold accent.
+   Default is LIGHT (editorial); add data-theme="dark" to opt into the dark mirror. */
+
+:root {
+  /* ───── Base palette — editorial light (cream + ink) ───── */
+  --ms-bg:            #FAFAF7;   /* warm off-white, like uncoated paper */
+  --ms-surface:       #FFFFFF;   /* pure white cards pop subtly on cream */
+  --ms-surface-2:     #F2F1EC;   /* raised: hover rows, nested panels */
+  --ms-border:        #E5E1D6;   /* warm beige, soft separator */
+  --ms-border-strong: #D0C9BB;   /* stronger emphasis lines */
+
+  /* Semantic colors */
+  --ms-ink:           #1A1A1A;   /* near-black headline / primary action */
+  --ms-red:           #C53030;   /* newspaper red — severity high, recall */
+  --ms-amber:         #B45309;   /* warm ochre — severity moderate */
+  --ms-green:         #15803D;   /* forest — severity low / cache hit */
+  --ms-teal:          #0E7490;   /* deep teal — research */
+  --ms-purple:        #6D28D9;   /* deep indigo — side effects */
+  --ms-pink:          #BE185D;
+  --ms-muted:         #8E8779;
+
+  --ms-text-1:        #1A1A1A;
+  --ms-text-2:        #5C5550;
+  --ms-text-3:        #8E8779;
+
+  /* ───── Semantic aliases ───── */
+  --surface-page:     var(--ms-bg);
+  --surface-card:     var(--ms-surface);
+  --surface-raised:   var(--ms-surface-2);
+  --border-default:   var(--ms-border);
+  --border-strong:    var(--ms-border-strong);
+  --border-focus:     var(--ms-ink);
+
+  --text-body:        var(--ms-text-1);
+  --text-secondary:   var(--ms-text-2);
+  --text-muted:       var(--ms-text-3);
+
+  /* Editorial: ink-on-cream primary buttons (no bright blue) */
+  --accent:           var(--ms-ink);
+  --accent-hover:     #2F2F2F;
+  --accent-press:     #000000;
+  --accent-on:        #FAFAF7;   /* text color ON the accent fill */
+
+  /* Severity scale */
+  --severity-high:    var(--ms-red);
+  --severity-moderate:var(--ms-amber);
+  --severity-low:     var(--ms-green);
+
+  /* Status */
+  --research:         var(--ms-teal);
+  --nav-active:       var(--ms-ink);
+
+  /* Tints — denser for visibility on cream paper */
+  --tint-ink:         rgba(26,  26,  26,  0.06);
+  --tint-blue:        rgba(26,  26,  26,  0.08);  /* "info" aliased to ink on light */
+  --tint-red:         rgba(197, 48,  48,  0.10);
+  --tint-amber:       rgba(180, 83,  9,   0.11);
+  --tint-green:       rgba(21,  128, 61,  0.10);
+  --tint-teal:        rgba(14,  116, 144, 0.10);
+  --tint-purple:      rgba(109, 40,  217, 0.10);
+
+  /* Data-viz curves — keep vibrant for chart legibility on both themes */
+  --plot-1: #1A4D8C;
+  --plot-2: #6D28D9;
+  --plot-3: #0E7490;
+  --plot-4: #BE185D;
+  --plot-5: #B45309;
+  --plot-6: #15803D;
+
+  /* Texture + nav glass */
+  --dot-color:        rgba(26, 26, 26, 0.06);
+  --nav-bg:           rgba(250, 250, 247, 0.88);
+}
+
+/* ─────────────────────────────────────────────────────
+   Dark mirror — same editorial bones, inverted contrast.
+   Opt-in: set data-theme="dark" on <html>.
+   ───────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --ms-bg:            #14130F;
+  --ms-surface:       #1F1D17;
+  --ms-surface-2:     #2A2720;
+  --ms-border:        #3A362C;
+  --ms-border-strong: #544F42;
+
+  --ms-text-1:        #F5F2EB;
+  --ms-text-2:        #B5B0A4;
+  --ms-text-3:        #7E7A6E;
+
+  /* Inverted primary — cream on ink */
+  --accent:           #F5F2EB;
+  --accent-hover:     #FFFFFF;
+  --accent-press:     #D9D4C6;
+  --accent-on:        #1A1A1A;
+
+  --border-focus:     #F5F2EB;
+  --nav-active:       #F5F2EB;
+
+  /* Severity — brightened for dark contrast */
+  --ms-red:           #F87171;
+  --ms-amber:         #F59E0B;
+  --ms-green:         #4ADE80;
+  --ms-teal:          #2DD4BF;
+  --ms-purple:        #A78BFA;
+  --ms-pink:          #F472B6;
+
+  --severity-high:    var(--ms-red);
+  --severity-moderate:var(--ms-amber);
+  --severity-low:     var(--ms-green);
+  --research:         var(--ms-teal);
+
+  /* Tints — denser for dark bg */
+  --tint-ink:         rgba(245, 242, 235, 0.06);
+  --tint-blue:        rgba(245, 242, 235, 0.08);
+  --tint-red:         rgba(248, 113, 113, 0.14);
+  --tint-amber:       rgba(245, 158, 11,  0.14);
+  --tint-green:       rgba(74,  222, 128, 0.14);
+  --tint-teal:        rgba(45,  212, 191, 0.14);
+  --tint-purple:      rgba(167, 139, 250, 0.14);
+
+  /* Data-viz curves — brighter on dark */
+  --plot-1: #60A5FA;
+  --plot-2: #A78BFA;
+  --plot-3: #2DD4BF;
+  --plot-4: #F472B6;
+  --plot-5: #FBBF24;
+  --plot-6: #4ADE80;
+
+  --dot-color:        rgba(245, 242, 235, 0.06);
+  --nav-bg:           rgba(31, 29, 23, 0.88);
+}
