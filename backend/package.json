@@ -1,0 +1,29 @@
+{
+  "name": "dosepair-backend",
+  "version": "1.0.0",
+  "description": "DosePair drug interaction analyzer - backend API",
+  "main": "index.js.v1",
+  "scripts": {
+    "start": "node index.js.v1",
+    "dev": "node --watch index.js.v1",
+    "test:security": "jest --config jest.config.js --forceExit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.55.0",
+    "@google/generative-ai": "^0.24.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "openai": "^4.93.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/*-test.js.v1"]
+  }
+}
