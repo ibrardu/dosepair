@@ -8,6 +8,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const { validateMedications } = require('./validate.js.v1');
+const { createLLMAdapter } = require('./llm.js.v1');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -52,6 +53,89 @@ const analyzeLimiter = rateLimit({
   },
 });
 
+// Strips markdown fences and parses JSON from LLM output
+function parseJsonFromLLM(raw) {
+  const stripped = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+  return JSON.parse(stripped);
+}
+
+// Validates that the LLM response contains all required top-level fields
+function validateResponseShape(obj) {
+  const required = ['drugs', 'interactions', 'insights', 'recommended_schedule', 'summary'];
+  for (const key of required) {
+    if (obj[key] === undefined) return `missing field "${key}"`;
+    if (key !== 'summary' && !Array.isArray(obj[key])) return `"${key}" must be an array`;
+  }
+  if (typeof obj.summary !== 'string' || obj.summary.trim() === '') {
+    return '"summary" must be a non-empty string';
+  }
+  return null;
+}
+
+// Builds the system prompt. Disease context is appended when present.
+function buildSystemPrompt(disease) {
+  const diseaseClause = disease
+    ? `\nPatient condition context: ${disease.trim()}. Factor this into interaction severity and scheduling recommendations where clinically relevant.`
+    : '';
+
+  return `You are a clinical pharmacology expert. Analyze the provided medication list for pharmacokinetic and pharmacodynamic interactions.
+
+Return ONLY valid JSON - no markdown, no prose, no code fences. The response must conform exactly to this shape:
+
+{
+  "drugs": [
+    {
+      "name": "string (exact name as submitted)",
+      "rxcui": "string (RxNorm CUI or - if unknown)",
+      "halfLife": number (hours),
+      "peakOffset": number (hours to peak after dose),
+      "metabolism": "string (primary enzyme or pathway)",
+      "route": "string (oral | iv | topical | inhaled | sublingual | etc)"
+    }
+  ],
+  "interactions": [
+    {
+      "pair": ["drug1", "drug2"],
+      "severity": "high",
+      "effect": "string (clinical consequence, one sentence)",
+      "mechanism": "string (pharmacological mechanism, one sentence)"
+    }
+  ],
+  "insights": [
+    {
+      "type": "warning",
+      "text": "string (actionable instruction, sentence case)",
+      "why": "string (mechanism in plain language)",
+      "related_drugs": ["drug1", "drug2"],
+      "actionable": true
+    }
+  ],
+  "recommended_schedule": [
+    {
+      "drug": "string",
+      "hour": number (0-23),
+      "time": "string (e.g. 8am, 2pm)",
+      "recommended": true,
+      "note": "string (brief scheduling rationale)"
+    }
+  ],
+  "summary": "string (1-2 sentences, clinical tone, sentence case)"
+}
+
+Rules:
+- severity must be exactly one of: high, moderate, low
+- interactions severity "high" = avoid or requires clinical supervision; "moderate" = manage with timing or monitoring; "low" = minimal clinical significance
+- recommended_schedule must space interacting drugs to minimize peak plasma overlap
+- Only report drug interactions supported by clinical literature or pharmacokinetic reasoning
+- If a drug is unfamiliar, still include it in drugs[] with rxcui "-" and metabolism "Unknown - LLM estimated"
+- summary must not use em dashes; use a regular hyphen instead
+- Every drug in the input must appear in drugs[]
+- Do not include PHI, do not reference the patient by name${diseaseClause}`;
+}
+
 // Health check - reveals active provider, never reveals keys
 app.get('/health', (req, res) => {
   res.json({
@@ -61,14 +145,66 @@ app.get('/health', (req, res) => {
   });
 });
 
-// POST /api/analyze - placeholder wired with rate limiter and validation
-// Full implementation added in chunk 4 once LLM adapters are in place
-app.post('/api/analyze', analyzeLimiter, (req, res) => {
-  const error = validateMedications(req.body);
-  if (error) {
-    return res.status(400).json({ error });
+// POST /api/analyze
+app.post('/api/analyze', analyzeLimiter, async (req, res) => {
+  const validationError = validateMedications(req.body);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
-  res.status(501).json({ error: 'LLM adapter not yet wired. Coming in chunk 4.' });
+
+  const { medications, disease } = req.body;
+
+  const medList = medications
+    .map((m) => {
+      const parts = [m.name.trim()];
+      if (m.dose) parts.push(m.dose.trim());
+      if (m.route) parts.push(`(${m.route.trim()})`);
+      return parts.join(' ');
+    })
+    .join(', ');
+
+  const systemPrompt = buildSystemPrompt(disease);
+
+  try {
+    let adapter;
+    try {
+      adapter = createLLMAdapter();
+    } catch (initErr) {
+      console.error('[dosepair] LLM init error:', initErr.message);
+      return res.status(500).json({ error: 'LLM provider configuration error. Check server environment.' });
+    }
+
+    const rawText = await adapter.complete(systemPrompt, `Medications: ${medList}`);
+
+    let parsed;
+    try {
+      parsed = parseJsonFromLLM(rawText);
+    } catch {
+      console.error('[dosepair] JSON parse failure. Raw:', rawText.slice(0, 300));
+      return res.status(500).json({ error: 'LLM returned non-JSON output. Please retry.' });
+    }
+
+    const structureError = validateResponseShape(parsed);
+    if (structureError) {
+      console.error('[dosepair] Response shape error:', structureError);
+      return res.status(500).json({ error: `Incomplete LLM response: ${structureError}. Please retry.` });
+    }
+
+    return res.json(parsed);
+  } catch (err) {
+    const status = err.status || err.statusCode;
+    if (status === 401) {
+      return res.status(500).json({ error: 'LLM API authentication failed. Check server API key.' });
+    }
+    if (status === 429) {
+      return res.status(429).json({ error: 'LLM provider rate limit exceeded. Please retry in a moment.' });
+    }
+    if (status === 400) {
+      return res.status(500).json({ error: 'LLM rejected the request. The medication list may be malformed.' });
+    }
+    console.error('[dosepair] LLM call failed:', err.message);
+    return res.status(500).json({ error: 'Analysis failed due to an LLM error. Please retry.' });
+  }
 });
 
 // 404 handler for any unmatched route
