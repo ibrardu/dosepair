@@ -239,6 +239,40 @@ function MedRowInput({ row, index, showHeaders, removable, onUpdate, onRemove }:
 }
 
 // ---------------------------------------------------------------------------
+// validate - strips empty rows and checks time formats
+// ---------------------------------------------------------------------------
+
+interface ValidationResult {
+  medications: AnalyzeMedication[];
+  firstError: string | null;
+}
+
+function validate(rows: MedRow[]): ValidationResult {
+  const medications: AnalyzeMedication[] = [];
+  let firstError: string | null = null;
+
+  for (const row of rows) {
+    const name = row.name.trim();
+    if (!name) continue; // strip blank rows
+
+    const med: AnalyzeMedication = { name };
+    if (row.dose.trim()) med.dose = row.dose.trim();
+    if (row.route) med.route = row.route;
+
+    if (row.time.trim()) {
+      const parsed = parseTime(row.time.trim());
+      if (!parsed && !firstError) {
+        firstError = `"${row.time.trim()}" is not a valid time for ${name}. Use formats like 8am, 14:30, or 2pm.`;
+      }
+    }
+
+    medications.push(med);
+  }
+
+  return { medications, firstError };
+}
+
+// ---------------------------------------------------------------------------
 // MedicationForm
 // ---------------------------------------------------------------------------
 
@@ -253,6 +287,7 @@ export function MedicationForm({
   const [disease, setDisease] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const atMax = rows.length >= MAX_ROWS;
   const hasName = rows.some((r) => r.name.trim().length > 0);
@@ -269,6 +304,50 @@ export function MedicationForm({
   const removeRow = useCallback((index: number) => {
     setRows((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
   }, []);
+
+  const submit = useCallback(async (currentRows: MedRow[], currentDisease: string) => {
+    const { medications, firstError } = validate(currentRows);
+
+    if (firstError) {
+      setError(firstError);
+      return;
+    }
+
+    if (medications.length === 0) return;
+
+    // Cancel any in-flight request before starting a new one
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
+    setLoading(true);
+    setError(null);
+
+    const payload: AnalyzePayload = { medications };
+    if (currentDisease.trim()) payload.disease = currentDisease.trim();
+
+    try {
+      const res = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: abortRef.current.signal,
+      });
+
+      const data = await res.json().catch(() => ({ error: `Server error ${res.status}.` }));
+
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error || `Server error ${res.status}.`);
+      }
+
+      onResult?.(data as AnalyzeResult);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      const message = err instanceof Error ? err.message : 'Analysis failed. Please retry.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiEndpoint, onResult]);
 
   return (
     <Card>
@@ -346,7 +425,7 @@ export function MedicationForm({
               size="md"
               fullWidth={false}
               disabled={!hasName || loading}
-              onClick={() => {}}
+              onClick={() => submit(rows, disease)}
               aria-label="Analyze interactions"
               aria-busy={loading}
             >
