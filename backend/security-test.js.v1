@@ -1,0 +1,272 @@
+'use strict';
+
+/**
+ * DosePair backend v1 - security test suite
+ *
+ * Run with: npm run test:security
+ * Uses jest + supertest. No real LLM calls are made; tests cover the
+ * HTTP layer only (headers, validation, rate limiting, CORS, error shape).
+ */
+
+const request = require('supertest');
+
+// Load app without starting the server
+process.env.NODE_ENV = 'test';
+process.env.LLM_PROVIDER = 'anthropic';
+process.env.ANTHROPIC_API_KEY = 'test-key-not-real';
+
+const app = require('./index.js.v1');
+
+// ---------------------------------------------------------------------------
+// HTTP security headers (helmet)
+// ---------------------------------------------------------------------------
+describe('Security headers', () => {
+  test('sets X-Content-Type-Options: nosniff', async () => {
+    const res = await request(app).get('/health');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  test('sets X-Frame-Options', async () => {
+    const res = await request(app).get('/health');
+    expect(res.headers['x-frame-options']).toBeDefined();
+  });
+
+  test('does not expose X-Powered-By', async () => {
+    const res = await request(app).get('/health');
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  test('sets Referrer-Policy', async () => {
+    const res = await request(app).get('/health');
+    expect(res.headers['referrer-policy']).toBeDefined();
+  });
+
+  test('health response never includes API key material', async () => {
+    const res = await request(app).get('/health');
+    const body = JSON.stringify(res.body);
+    // Provider name is allowed; actual key material must never appear
+    expect(body).not.toMatch(/api[_-]?key/i);
+    expect(body).not.toMatch(/sk-/);
+    expect(body).not.toMatch(/xai-/);
+    expect(body).not.toMatch(/AIza/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Input validation - 400 cases
+// ---------------------------------------------------------------------------
+describe('Input validation returns 400', () => {
+  async function post(payload) {
+    return request(app)
+      .post('/api/analyze')
+      .set('Content-Type', 'application/json')
+      .send(payload);
+  }
+
+  test('empty body object', async () => {
+    const res = await post({});
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  test('medications is null', async () => {
+    const res = await post({ medications: null });
+    expect(res.status).toBe(400);
+  });
+
+  test('medications is a string', async () => {
+    const res = await post({ medications: 'Warfarin' });
+    expect(res.status).toBe(400);
+  });
+
+  test('empty medications array', async () => {
+    const res = await post({ medications: [] });
+    expect(res.status).toBe(400);
+  });
+
+  test('medications array with 16 items (over limit)', async () => {
+    const meds = Array.from({ length: 16 }, (_, i) => ({ name: `Drug${i}` }));
+    const res = await post({ medications: meds });
+    expect(res.status).toBe(400);
+  });
+
+  test('medication item is not an object', async () => {
+    const res = await post({ medications: ['Warfarin'] });
+    expect(res.status).toBe(400);
+  });
+
+  test('medication name is empty string', async () => {
+    const res = await post({ medications: [{ name: '' }] });
+    expect(res.status).toBe(400);
+  });
+
+  test('medication name is only whitespace', async () => {
+    const res = await post({ medications: [{ name: '   ' }] });
+    expect(res.status).toBe(400);
+  });
+
+  test('medication name exceeds 100 characters', async () => {
+    const res = await post({ medications: [{ name: 'A'.repeat(101) }] });
+    expect(res.status).toBe(400);
+  });
+
+  test('medication name contains <script> injection', async () => {
+    const res = await post({ medications: [{ name: '<script>alert(1)</script>' }] });
+    expect(res.status).toBe(400);
+  });
+
+  test('medication name contains < character', async () => {
+    const res = await post({ medications: [{ name: 'Drug<inject' }] });
+    expect(res.status).toBe(400);
+  });
+
+  test('medication name contains > character', async () => {
+    const res = await post({ medications: [{ name: 'Drug>inject' }] });
+    expect(res.status).toBe(400);
+  });
+
+  test('medication dose is a number instead of string', async () => {
+    const res = await post({ medications: [{ name: 'Warfarin', dose: 5 }] });
+    expect(res.status).toBe(400);
+  });
+
+  test('medication route is a number instead of string', async () => {
+    const res = await post({ medications: [{ name: 'Warfarin', route: 1 }] });
+    expect(res.status).toBe(400);
+  });
+
+  test('disease is a number', async () => {
+    const res = await post({ medications: [{ name: 'Warfarin' }], disease: 42 });
+    expect(res.status).toBe(400);
+  });
+
+  test('disease exceeds 200 characters', async () => {
+    const res = await post({ medications: [{ name: 'Warfarin' }], disease: 'X'.repeat(201) });
+    expect(res.status).toBe(400);
+  });
+
+  test('disease contains injection characters', async () => {
+    const res = await post({ medications: [{ name: 'Warfarin' }], disease: '<svg onload=alert(1)>' });
+    expect(res.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Malformed JSON body
+// ---------------------------------------------------------------------------
+describe('Malformed JSON body returns 400', () => {
+  test('sends raw invalid JSON string', async () => {
+    const res = await request(app)
+      .post('/api/analyze')
+      .set('Content-Type', 'application/json')
+      .send('{ invalid json }');
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  test('sends truncated JSON', async () => {
+    const res = await request(app)
+      .post('/api/analyze')
+      .set('Content-Type', 'application/json')
+      .send('{"medications": [{"name": "War');
+    expect(res.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Payload size limit (body > 10kb returns 400)
+// ---------------------------------------------------------------------------
+describe('Payload size limit', () => {
+  test('oversized body is rejected', async () => {
+    const oversized = JSON.stringify({
+      medications: [{ name: 'Warfarin' }],
+      disease: 'X'.repeat(11000),
+    });
+    const res = await request(app)
+      .post('/api/analyze')
+      .set('Content-Type', 'application/json')
+      .send(oversized);
+    expect([400, 413]).toContain(res.status);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 404 and method restrictions
+// ---------------------------------------------------------------------------
+describe('Routing guards', () => {
+  test('GET /api/analyze returns 404', async () => {
+    const res = await request(app).get('/api/analyze');
+    expect(res.status).toBe(404);
+  });
+
+  test('GET /api/unknown returns 404', async () => {
+    const res = await request(app).get('/api/unknown');
+    expect(res.status).toBe(404);
+  });
+
+  test('DELETE /api/analyze returns 404', async () => {
+    const res = await request(app).delete('/api/analyze');
+    expect(res.status).toBe(404);
+  });
+
+  test('PUT /health returns 404', async () => {
+    const res = await request(app).put('/health');
+    expect(res.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Error response shape - every error must return { error: string }
+// ---------------------------------------------------------------------------
+describe('Error response shape', () => {
+  test('400 body has string error field', async () => {
+    const res = await request(app)
+      .post('/api/analyze')
+      .send({});
+    expect(res.status).toBe(400);
+    expect(typeof res.body.error).toBe('string');
+    expect(res.body.error.length).toBeGreaterThan(0);
+  });
+
+  test('404 body has string error field', async () => {
+    const res = await request(app).get('/api/nope');
+    expect(res.status).toBe(404);
+    expect(typeof res.body.error).toBe('string');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CORS
+// ---------------------------------------------------------------------------
+describe('CORS', () => {
+  test('POST /api/analyze responds (not blocked) from localhost origin', async () => {
+    const res = await request(app)
+      .post('/api/analyze')
+      .set('Origin', 'http://localhost:3000')
+      .send({ medications: [{ name: 'Warfarin' }] });
+    // 400 (invalid input), 429 (rate limit), or 500 (LLM auth with fake key)
+    // Any of these means the request reached the server - not blocked by CORS
+    expect([400, 429, 500]).toContain(res.status);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Health check
+// ---------------------------------------------------------------------------
+describe('Health check', () => {
+  test('GET /health returns 200 with status ok', async () => {
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+  });
+
+  test('GET /health returns version field', async () => {
+    const res = await request(app).get('/health');
+    expect(res.body).toHaveProperty('version');
+  });
+
+  test('GET /health returns provider field', async () => {
+    const res = await request(app).get('/health');
+    expect(res.body).toHaveProperty('provider');
+  });
+});

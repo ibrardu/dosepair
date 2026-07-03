@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js.v1",
     "dev": "node --watch index.js.v1",
-    "test:security": "jest --config jest.config.js --forceExit"
+    "test:security": "jest --forceExit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.55.0",
@@ -24,6 +24,8 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/*-test.js.v1"]
+    "testRegex": "security-test\\.js\\.v1$",
+    "transform": {},
+    "moduleFileExtensions": ["js", "mjs", "cjs", "jsx", "ts", "tsx", "json", "node", "v1"]
   }
 }
