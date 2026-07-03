@@ -239,6 +239,94 @@ function MedRowInput({ row, index, showHeaders, removable, onUpdate, onRemove }:
 }
 
 // ---------------------------------------------------------------------------
+// Spinner - 16px rotating arc using CSS animation injected once
+// ---------------------------------------------------------------------------
+
+const SPIN_STYLE = '@keyframes dp-spin { to { transform: rotate(360deg); } }';
+
+function Spinner() {
+  return (
+    <>
+      <style>{SPIN_STYLE}</style>
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        style={{ animation: 'dp-spin 0.8s linear infinite', flexShrink: 0 }}
+      >
+        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+      </svg>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ErrorBanner - error message with Retry button
+// ---------------------------------------------------------------------------
+
+interface ErrorBannerProps {
+  message: string;
+  onRetry: () => void;
+}
+
+function ErrorBanner({ message, onRetry }: ErrorBannerProps) {
+  return (
+    <div
+      role="alert"
+      aria-live="assertive"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 'var(--space-3)',
+        padding: 'var(--space-4) var(--space-5)',
+        background: 'var(--tint-red)',
+        border: '1px solid var(--severity-high)',
+        borderRadius: 'var(--radius-lg)',
+        fontSize: 'var(--text-sm)',
+        fontFamily: 'var(--font-body)',
+        lineHeight: 'var(--leading-body)',
+        color: 'var(--severity-high)',
+      }}
+    >
+      <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          style={{ flexShrink: 0, marginTop: 2 }}
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <span>{message}</span>
+      </div>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onRetry}
+        style={{ flexShrink: 0, color: 'var(--severity-high)', borderColor: 'var(--severity-high)' }}
+      >
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // validate - strips empty rows and checks time formats
 // ---------------------------------------------------------------------------
 
@@ -426,6 +514,7 @@ export function MedicationForm({
               fullWidth={false}
               disabled={!hasName || loading}
               onClick={() => submit(rows, disease)}
+              icon={loading ? <Spinner /> : undefined}
               aria-label="Analyze interactions"
               aria-busy={loading}
             >
@@ -433,6 +522,16 @@ export function MedicationForm({
             </Button>
           </div>
         </div>
+
+        {error && (
+          <ErrorBanner
+            message={error}
+            onRetry={() => {
+              setError(null);
+              submit(rows, disease);
+            }}
+          />
+        )}
       </div>
     </Card>
   );
