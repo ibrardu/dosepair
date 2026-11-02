@@ -1,11 +1,14 @@
-import * as React from 'react';
+import * as React from "react";
 
-export type SelectOption = string | { value: string; label: React.ReactNode };
-
-export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'style'> {
-  label?: React.ReactNode;
-  options?: SelectOption[];
+/**
+ * Native select styled to match Input — used for route (oral / topical / …)
+ * and time pickers in medication rows.
+ */
+export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label?: string;
+  /** Either plain strings or { value, label } pairs. */
+  options?: Array<string | { value: string; label: string }>;
   style?: React.CSSProperties;
 }
 
-export declare function Select(props: SelectProps): React.JSX.Element;
+export declare function Select(props: SelectProps): React.ReactElement;
